@@ -1,16 +1,10 @@
 package de.linusdev.sodiumcoreshadersupport.mixin.client;
 
-import net.caffeinemc.mods.sodium.client.gl.shader.GlShader;
-import net.caffeinemc.mods.sodium.client.gl.shader.ShaderConstants;
 import net.caffeinemc.mods.sodium.client.gl.shader.ShaderLoader;
-import net.caffeinemc.mods.sodium.client.gl.shader.ShaderType;
 import net.minecraft.resources.Identifier;
 import org.apache.commons.io.IOUtils;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,13 +15,6 @@ import static de.linusdev.sodiumcoreshadersupport.SodiumCoreShaderSupportClient.
 
 @Mixin(ShaderLoader.class)
 public class MixinShaderLoader {
-
-    @Inject(at = @At("HEAD"), method = "loadShader")
-    private static void loadShaderInject(
-            ShaderType type, Identifier name, ShaderConstants constants, CallbackInfoReturnable<GlShader> cir
-    ) {
-        LOG.info("Start loading shader in namespace '{}': {}", name.getNamespace(), name.getPath());
-    }
 
     /**
      * Loads a shader from the active resource packs first, then falls back to Sodium's
