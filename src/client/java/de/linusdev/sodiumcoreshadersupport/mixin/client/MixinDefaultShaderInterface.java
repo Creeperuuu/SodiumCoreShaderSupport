@@ -1,6 +1,8 @@
 package de.linusdev.sodiumcoreshadersupport.mixin.client;
 
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.textures.GpuSampler;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlTexelBuffer;
 import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformFloat;
 import net.caffeinemc.mods.sodium.client.render.chunk.shader.ChunkShaderOptions;
 import net.caffeinemc.mods.sodium.client.render.chunk.shader.DefaultShaderInterface;
@@ -43,21 +45,31 @@ public abstract class MixinDefaultShaderInterface {
     }
 
     @Inject(at = @At("RETURN"), method = "setupState", remap = false)
-    private void injectSetupState(TerrainRenderPass pass, FogParameters parameters, GpuSampler terrainSampler, CallbackInfo ci) {
+    private void injectSetupState(
+            TerrainRenderPass pass,
+            FogParameters parameters,
+            GpuSampler terrainSampler,
+            GpuBufferSlice terrainBuffer,
+            GlTexelBuffer terrainTexelBuffer,
+            CallbackInfo ci
+    ) {
         Minecraft minecraft = Minecraft.getInstance();
         long time = minecraft.level == null ? 0L : minecraft.level.getGameTime();
         DeltaTracker deltaTracker = minecraft.getDeltaTracker();
         float partialTick = deltaTracker.getGameTimeDeltaPartialTick(false);
-        if(sodiumCoreShaderSupport$uniformGameTime != null)
+
+        if (sodiumCoreShaderSupport$uniformGameTime != null) {
             sodiumCoreShaderSupport$uniformGameTime.set(
-                    ((float)(time % 24000L) + partialTick) / 24000.0F
+                    ((float) (time % 24000L) + partialTick) / 24000.0F
             );
-        if(sodiumCoreShaderSupport$uniformSunAngle != null) {
+        }
+
+        if (sodiumCoreShaderSupport$uniformSunAngle != null) {
             float sunAngle = 0.0F;
             Camera camera = minecraft.gameRenderer.getMainCamera();
-            if(minecraft.level != null && camera != null && camera.isInitialized()) {
+            if (minecraft.level != null && camera != null && camera.isInitialized()) {
                 EnvironmentAttributeProbe probe = camera.attributeProbe();
-                if(probe != null) {
+                if (probe != null) {
                     sunAngle = probe.getValue(EnvironmentAttributes.SUN_ANGLE, partialTick) * Mth.DEG_TO_RAD;
                 }
             }
