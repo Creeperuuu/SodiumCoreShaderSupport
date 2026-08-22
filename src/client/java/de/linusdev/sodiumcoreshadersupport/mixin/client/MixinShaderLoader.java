@@ -9,7 +9,7 @@ import org.apache.commons.io.IOUtils;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.io.IOException;
@@ -30,46 +30,43 @@ public class MixinShaderLoader {
     }
 
     /**
-     * Loads Sodium shader sources from the active Minecraft ResourceManager instead of
-     * directly from the Sodium classpath resources.
+     * Loads a shader from the active resource packs first, then falls back to Sodium's
+     * bundled shader resource. This lets packs override only the shaders they provide
+     * while imported Sodium includes continue to work normally.
      *
      * @author LinusDev
-     * @reason Allow resource packs to override Sodium core shaders.
+     * @reason Allow resource packs to override Sodium core shaders without breaking imports.
      */
     @Overwrite
     public static String getShaderSource(Identifier name) {
-        if (shaders == null) {
-            LOG.warn("Trying to load shaders, but shaders variable is not yet initialised; falling back to Sodium's classpath loader");
-            String path = String.format("/assets/%s/shaders/%s", name.getNamespace(), name.getPath());
-
-            try (InputStream in = ShaderLoader.class.getResourceAsStream(path)) {
-                if (in == null) {
-                    throw new RuntimeException("Shader not found: " + path);
+        if (shaders != null) {
+            var namespace = shaders.get(name.getNamespace());
+            if (namespace != null) {
+                var shaderResource = namespace.get(name.getPath());
+                if (shaderResource != null) {
+                    try {
+                        LOG.info("Loaded shader '{}:{}' from pack '{}'.", name.getNamespace(), name.getPath(),
+                                shaderResource.source().location().title().getString());
+                        return IOUtils.toString(shaderResource.open(), StandardCharsets.UTF_8);
+                    } catch (IOException e) {
+                        throw new RuntimeException("Exception while reading shader source in namespace '"
+                                + name.getNamespace() + "' for shader '" + name.getPath() + "'", e);
+                    }
                 }
-                return IOUtils.toString(in, StandardCharsets.UTF_8);
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to read shader source for " + path, e);
             }
         }
 
-        var namespace = shaders.get(name.getNamespace());
-        if (namespace == null) {
-            throw new RuntimeException("No shaders available for namespace '" + name.getNamespace() + "'");
-        }
-
-        var shaderResource = namespace.get(name.getPath());
-        if (shaderResource == null) {
-            throw new RuntimeException("No shader found in namespace '" + name.getNamespace()
-                    + "' for shader '" + name.getPath() + "'");
-        }
-
-        try {
-            LOG.info("Loaded shader '{}:{}' from pack '{}'.", name.getNamespace(), name.getPath(),
-                    shaderResource.source().location().title().getString());
-            return IOUtils.toString(shaderResource.open(), StandardCharsets.UTF_8);
+        // The resource pack did not override this shader. Fall back to Sodium's bundled copy.
+        String path = String.format("/assets/%s/shaders/%s", name.getNamespace(), name.getPath());
+        try (InputStream in = ShaderLoader.class.getResourceAsStream(path)) {
+            if (in == null) {
+                throw new RuntimeException("Shader not found in resource packs or Sodium: " + name);
+            }
+            LOG.info("Loaded shader '{}:{}' from Sodium's bundled resources.",
+                    name.getNamespace(), name.getPath());
+            return IOUtils.toString(in, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new RuntimeException("Exception while reading shader source in namespace '" + name.getNamespace()
-                    + "' for shader '" + name.getPath() + "'", e);
+            throw new RuntimeException("Failed to read shader source for " + path, e);
         }
     }
 }
